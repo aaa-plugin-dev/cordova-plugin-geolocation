@@ -171,13 +171,16 @@
     CDVLocationData* cData = self.locationData;
 
     cData.locationInfo = newLocation;
-    if (self.locationData.locationCallbacks.count > 0) {
-        for (NSString* callbackId in self.locationData.locationCallbacks) {
-            [self returnLocationInfo:callbackId andKeepCallback:NO];
+    @synchronized (self.locationData.locationCallbacks) {
+        if (self.locationData.locationCallbacks.count > 0) {
+            for (NSString* callbackId in self.locationData.locationCallbacks) {
+                [self returnLocationInfo:callbackId andKeepCallback:NO];
+            }
+            
+            [self.locationData.locationCallbacks removeAllObjects];
         }
-
-        [self.locationData.locationCallbacks removeAllObjects];
     }
+    
     if (self.locationData.watchCallbacks.count > 0) {
         for (NSString* timerId in self.locationData.watchCallbacks) {
             [self returnLocationInfo:[self.locationData.watchCallbacks objectForKey:timerId] andKeepCallback:YES];
@@ -205,14 +208,18 @@
                 self.locationData = [[CDVLocationData alloc] init];
             }
             CDVLocationData* lData = self.locationData;
-            if (!lData.locationCallbacks) {
-                lData.locationCallbacks = [NSMutableArray arrayWithCapacity:1];
+            @synchronized (self.locationData.locationCallbacks) {
+                if (!lData.locationCallbacks) {
+                    lData.locationCallbacks = [NSMutableArray arrayWithCapacity:1];
+                }
             }
 
             if (!__locationStarted || (__highAccuracyEnabled != enableHighAccuracy)) {
                 // add the callbackId into the array so we can call back when get data
-                if (callbackId != nil) {
-                    [lData.locationCallbacks addObject:callbackId];
+                @synchronized (self.locationData.locationCallbacks) {
+                    if (callbackId != nil) {
+                        [lData.locationCallbacks addObject:callbackId];
+                    }
                 }
                 // Tell the location manager to start notifying us of heading updates
                 [self startLocation:enableHighAccuracy];
@@ -308,13 +315,16 @@
     [posError setObject:[NSNumber numberWithUnsignedInteger:errorCode] forKey:@"code"];
     [posError setObject:message ? message:@"" forKey:@"message"];
     CDVPluginResult* result = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:posError];
-
-    for (NSString* callbackId in self.locationData.locationCallbacks) {
-        [self.commandDelegate sendPluginResult:result callbackId:callbackId];
+    
+    
+    @synchronized (self.locationData.locationCallbacks) {
+        for (NSString* callbackId in self.locationData.locationCallbacks) {
+            [self.commandDelegate sendPluginResult:result callbackId:callbackId];
+        }
+        
+        [self.locationData.locationCallbacks removeAllObjects];
     }
-
-    [self.locationData.locationCallbacks removeAllObjects];
-
+    
     for (NSString* callbackId in self.locationData.watchCallbacks) {
         [self.commandDelegate sendPluginResult:result callbackId:callbackId];
     }
