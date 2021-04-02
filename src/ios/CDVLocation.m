@@ -181,13 +181,15 @@
         }
     }
     
-    if (self.locationData.watchCallbacks.count > 0) {
-        for (NSString* timerId in self.locationData.watchCallbacks) {
-            [self returnLocationInfo:[self.locationData.watchCallbacks objectForKey:timerId] andKeepCallback:YES];
+    @synchronized (self.locationData.watchCallbacks) {
+        if (self.locationData.watchCallbacks.count > 0) {
+            for (NSString* timerId in self.locationData.watchCallbacks) {
+                [self returnLocationInfo:[self.locationData.watchCallbacks objectForKey:timerId] andKeepCallback:YES];
+            }
+        } else {
+            // No callbacks waiting on us anymore, turn off listening.
+            [self _stopLocation];
         }
-    } else {
-        // No callbacks waiting on us anymore, turn off listening.
-        [self _stopLocation];
     }
 }
 
@@ -266,10 +268,12 @@
 {
     NSString* timerId = [command argumentAtIndex:0];
 
-    if (self.locationData && self.locationData.watchCallbacks && [self.locationData.watchCallbacks objectForKey:timerId]) {
-        [self.locationData.watchCallbacks removeObjectForKey:timerId];
-        if([self.locationData.watchCallbacks count] == 0) {
-            [self _stopLocation];
+    @synchronized (self.locationData.watchCallbacks) {
+        if (self.locationData && self.locationData.watchCallbacks && [self.locationData.watchCallbacks objectForKey:timerId]) {
+            [self.locationData.watchCallbacks removeObjectForKey:timerId];
+            if([self.locationData.watchCallbacks count] == 0) {
+                [self _stopLocation];
+            }
         }
     }
 }
@@ -325,8 +329,10 @@
         [self.locationData.locationCallbacks removeAllObjects];
     }
     
-    for (NSString* callbackId in self.locationData.watchCallbacks) {
-        [self.commandDelegate sendPluginResult:result callbackId:callbackId];
+    @synchronized (self.locationData.watchCallbacks) {
+        for (NSString* callbackId in self.locationData.watchCallbacks) {
+            [self.commandDelegate sendPluginResult:result callbackId:callbackId];
+        }
     }
 }
 
