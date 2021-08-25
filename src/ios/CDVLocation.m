@@ -308,7 +308,12 @@
         [result setKeepCallbackAsBool:keepCallback];
     }
     if (result) {
-        [self.commandDelegate sendPluginResult:result callbackId:callbackId];
+        @try {
+            [self.commandDelegate sendPluginResult:result callbackId:callbackId];
+        }
+        @catch (NSException *exception) {
+            NSLog(@"locationManager::returnLocationInfoError %@", exception.reason);
+        }
     }
 }
 
